@@ -1,0 +1,3 @@
+# AI Service Requirements
+flask
+requests

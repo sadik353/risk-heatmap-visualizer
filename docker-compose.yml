@@ -1,0 +1,67 @@
+version: '3.8'
+
+services:
+  risk-postgres:
+    image: postgres:15
+    container_name: risk-postgres
+    environment:
+      POSTGRES_DB: risk_heatmap_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d risk_heatmap_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  risk-redis:
+    image: redis:7-alpine
+    container_name: risk-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  risk-backend:
+    build: ./backend
+    container_name: risk-backend
+    ports:
+      - "8080:8080"
+    depends_on:
+      risk-postgres:
+        condition: service_healthy
+      risk-redis:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://risk-postgres:5432/risk_heatmap_db
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      JWT_SECRET: RiskHeatmapVisualiserJwtSecretKey2026VerySecureForSpringBoot
+      JWT_EXPIRATION: 86400000
+      REDIS_HOST: risk-redis
+      REDIS_PORT: 6379
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      AI_SERVICE_URL: http://risk-ai:5000
+    restart: unless-stopped
+
+  risk-frontend:
+    build: ./frontend
+    container_name: risk-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - risk-backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
